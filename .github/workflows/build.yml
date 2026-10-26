@@ -1,0 +1,94 @@
+# Build, check, and publish prebuilt binaries of readxlsb.
+#
+# Windows (.zip) and macOS (.tgz) binaries are uploaded as workflow artifacts
+# on every run, and attached to a GitHub Release when a tag such as v0.1.61
+# is pushed. Installing a binary does not require Rtools or Xcode.
+name: build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: ${{ matrix.os }} / R ${{ matrix.r }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        r: ['4.4', '4.5', '4.6']
+
+    env:
+      R_KEEP_PKG_SOURCE: yes
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+
+      - name: Build binary package
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p binaries
+          R CMD INSTALL --build --no-multiarch .
+          version=$(grep '^Version:' DESCRIPTION | awk '{print $2}')
+          rver="${{ matrix.r }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            mv readxlsb_${version}.zip "binaries/readxlsb_${version}_R${rver}_windows.zip"
+          else
+            arch=$(uname -m)
+            mv readxlsb_${version}.tgz "binaries/readxlsb_${version}_R${rver}_macos-${arch}.tgz"
+          fi
+          ls -l binaries
+
+      - name: Upload binary artifact
+        if: runner.os != 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: readxlsb-${{ runner.os }}-R${{ matrix.r }}
+          path: binaries/*
+          if-no-files-found: error
+
+  release:
+    name: Attach binaries to release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: List binaries
+        run: ls -l binaries
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: binaries/*
+          generate_release_notes: true
