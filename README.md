@@ -21,15 +21,17 @@ then install it directly. For example, on Windows with R 4.5:
 install.packages("Rcpp")  # runtime dependencies
 install.packages(c("xml2", "cellranger"))
 install.packages(
-  "https://github.com/ThomUK/readxlsb/releases/latest/download/readxlsb_0.1.61_R4.5_windows.zip",
+  "https://github.com/ThomUK/readxlsb/releases/latest/download/readxlsb_0.2.0_R4.5_windows.zip",
   repos = NULL, type = "win.binary"
 )
 ```
 
 On macOS use the matching `.tgz` file and `type = "mac.binary"`.
 
-Binaries from every commit are also available as artifacts on the
-[Actions tab](https://github.com/ThomUK/readxlsb/actions).
+Binaries are built when a version tag is pushed. To build them from any
+commit without cutting a release, run the `build` workflow manually from the
+[Actions tab](https://github.com/ThomUK/readxlsb/actions); the files appear as
+artifacts on that run.
 
 ### From source
 
